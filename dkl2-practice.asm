@@ -107,6 +107,7 @@ timer_seconds:              db
 timer_minutes:              db
 lag_frames:                 db
 already_printed_timer:      db
+vram_transfer_phase_timer:  db
 selected_world:             db
 selected_level:             db
 selected_char:              db
@@ -235,6 +236,7 @@ IF FRAMECOUNTER == 1
             ld      [timer_minutes], a
 ENDC
             ld      [lag_frames], a
+            ld      [vram_transfer_phase_timer], a
             ld      [selected_world], a
             ld      [selected_level], a
             ld      [selected_char], a
@@ -884,27 +886,70 @@ my_vblank::
             ; check if in valid state to print timer   
             ld      a, [$df6e]
             cp      $01
-            jr      nz, .reset_already_printed_timer
+            jp      nz, .reset_already_printed_timer
 
             ld      a, [already_printed_timer]
             cp      $01
-            jr      z, .vblank_continue
+            jp      z, .vblank_continue
 
 
-            ; set up numbers in vram
-            ld      de, OWN_GFX_VRAM
-            ld      hl, OWN_GFX_VRAM_TIMER
-            ld      b, $10*NUM_DIGITS
+            ; set up numbers in vram. this is done in multiple passes because doing it in 1 would take too long
+            ld      a, [vram_transfer_phase_timer]
 
-            ; uuuh why do i have to do this
-            .loop
+            and     a
+            jr      z, .phase_one
+
+            dec     a
+            jr      z, .phase_two
+
+
+            .phase_three
+            ld      de, OWN_GFX_VRAM+$10*8
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*8
+            ld      b, $10*2
+            .loop3
             ld      a, [de]
             ld      [hl+], a
             inc     de
             dec     b
-            jr      nz, .loop
+            jr      nz, .loop3
+            ld      a, [vram_transfer_phase_timer]
+            inc     a
+            ld      [vram_transfer_phase_timer], a
+            jp      .print_timer
 
+            
+            .phase_one
+            ld      de, OWN_GFX_VRAM
+            ld      hl, OWN_GFX_VRAM_TIMER
+            ld      b, $10*4
+            .loop1
+            ld      a, [de]
+            ld      [hl+], a
+            inc     de
+            dec     b
+            jr      nz, .loop1
+            ld      a, [vram_transfer_phase_timer]
+            inc     a
+            ld      [vram_transfer_phase_timer], a
+            jp      .vblank_continue
+            
+            .phase_two
+            ld      de, OWN_GFX_VRAM+$10*4
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*4
+            ld      b, $10*4
+            .loop2
+            ld      a, [de]
+            ld      [hl+], a
+            inc     de
+            dec     b
+            jr      nz, .loop2
+            ld      a, [vram_transfer_phase_timer]
+            inc     a
+            ld      [vram_transfer_phase_timer], a
+            jp      .vblank_continue
 
+            .print_timer
             ; print timer_minutes
             ld      a, [timer_minutes]
             ld      c, a
@@ -957,18 +1002,11 @@ my_vblank::
             ld      [VRAM_FRAME_COUNTER+6], a
 
 
-            ;ld      b, a
-            ;swap    a
-            ;and     $0f
-            ;add     TILE_0_INGAME
-            ;ld      [VRAM_FRAME_COUNTER+0], a
-            ;ld      a, b
-            ;and     $0f
-            ;add     TILE_0_INGAME
-            ;ld      [VRAM_FRAME_COUNTER+1], a
-
             ld      a, $01
             ld      [already_printed_timer], a
+            ld      a, $00
+            ld      [vram_transfer_phase_timer], a
+
             jr      .vblank_continue
 
 .reset_already_printed_timer
