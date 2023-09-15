@@ -1,6 +1,6 @@
 .DELETE_ON_ERROR:
 
-ROM = dkl2-savestate-patched.gb
+ROM = dkl2.gb
 
 BUILD_DIR = build
 GFX_DIR = gfx
@@ -49,7 +49,7 @@ FIX = rgbfix
 FIXFLAGS = -f gh -p 255 -m "MBC5+RAM+BATTERY"
 GFX = rgbgfx
 GFXFLAGS = -c embedded
-PYTHON = python3
+PYTHON = python
 
 all: $(OUTPUT_ROM_STD) $(OUTPUT_ROM_FRAMES) $(OUTPUT_ROM_LAG)
 

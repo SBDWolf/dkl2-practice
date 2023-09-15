@@ -34,7 +34,7 @@ BIT_SPRITE_ENABLE           equ     1
 BIT_8x16_SPRITES            equ     2
 WAIT_FOR_LINE               equ     $35c2
 LINE_VBLANK                 equ     $90
-FREE_WRAM                   equ     $ddf0
+FREE_WRAM                   equ     $dde0
 WORLD_VRAM                  equ     $9800
 LEVEL_VRAM                  equ     $9820
 LEVEL_COLUMN_VRAM           equ     $98a4
@@ -100,8 +100,12 @@ FIRST_BOOT_MAGIC            equ     $ab
 
 SECTION "variables", WRAMX[FREE_WRAM], BANK[1]
 first_boot:                 db
-frame:                      db
+uncapped_frames:            db
+timer_frames:               db
+timer_seconds:              db
+timer_minutes:              db
 lag_frames:                 db
+already_printed_timer:      db
 selected_world:             db
 selected_level:             db
 selected_char:              db
@@ -135,6 +139,14 @@ SECTION "menu_loader", ROM0[$0186]
 SECTION "suppress_overworld", ROMX[$70b3], BANK[2]
             jp      $7168
 SECTION "jump_over_overworld", ROMX[$7178], BANK[2]
+IF FRAMECOUNTER == 1
+            ld      b, a
+            xor     a
+            ld      [timer_frames], a
+            ld      [timer_seconds], a
+            ld      [timer_minutes], a
+            ld      a, b
+ENDC
             jr      $7199
 
 SECTION "do_not_decrement_lives", ROM0[$037c]
@@ -189,9 +201,9 @@ menu::
             call    calculate_num_levels
             call    wait_for_vblank
             call    TRANSFER_OAM_BUFFER
-            ld      a, [frame]
+            ld      a, [uncapped_frames]
             inc     a
-            ld      [frame], a
+            ld      [uncapped_frames], a
             and     1
             jr      nz, .odd
 .even
@@ -215,7 +227,12 @@ init_variables::
             ld      a, FIRST_BOOT_MAGIC
             ld      [first_boot], a
             xor     a
-            ld      [frame], a
+            ld      [uncapped_frames], a
+IF FRAMECOUNTER == 1
+            ld      [timer_frames], a
+            ld      [timer_seconds], a
+            ld      [timer_minutes], a
+ENDC
             ld      [lag_frames], a
             ld      [selected_world], a
             ld      [selected_level], a
@@ -609,11 +626,6 @@ start_level::
 
             call    set_characters
             call    set_level_id
-IF FRAMECOUNTER == 1
-            call    copy_alnum
-            xor     a
-            ld      [frame], a
-ENDC
             pop     hl
 
             jp      $0199
@@ -835,18 +847,120 @@ end_of_own_graphics::
 
 IF FRAMECOUNTER == 1
 my_vblank::
-            ld      a, [frame]
+            ld      a, [timer_frames]
             inc     a
-            ld      [frame], a
+            ld      [timer_frames], a
+            cp      60
+            jr      nz, .check_if_should_print
+
+            xor     a
+            ld      [timer_frames], a
+
+            ld      a, [timer_seconds]
+            inc     a
+            ld      [timer_seconds], a
+            cp      60
+            jr      nz, .check_if_should_print
+
+            xor     a
+            ld      [timer_seconds], a
+
+            ld      a, [timer_minutes]
+            inc     a
+            ld      [timer_minutes], a
+            cp      10
+            jr      nz, .check_if_should_print
+
+            ld      a, 9
+            ld      [timer_minutes], a
+            ld      a, 59
+            ld      [timer_seconds], a
+            ld      [timer_frames], a
+
+
+.check_if_should_print
+; check if in valid state to print timer   
+            ld      a, [$df6e]
+            cp      $01
+            jr      nz, .reset_already_printed_timer
+
+            ld      a, [already_printed_timer]
+            cp      $01
+            jr      z, .vblank_continue
+
+
+            ; print timer_minutes
+            ld      a, [timer_minutes]
+            ld      c, a
+            ld      a, $00
             ld      b, a
-            swap    a
-            and     $0f
-            add     TILE_0_INGAME
+
+            ld      hl, ones_digits_table
+            add     hl, bc
+
+            ld      a, [hl]
             ld      [VRAM_FRAME_COUNTER+0], a
-            ld      a, b
-            and     $0f
-            add     TILE_0_INGAME
-            ld      [VRAM_FRAME_COUNTER+1], a
+
+
+            ; print timer_seconds
+            ld      a, [timer_seconds]
+            ld      c, a
+            ld      a, $00
+            ld      b, a
+
+            ld      hl, tens_digits_table
+            add     hl, bc
+
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+2], a
+
+            ; read from ones_digits_table. to save CPU time i can just add 100 to the previous offset...
+            ; ...since that table is located immediately after tens_digits_table and it's 100 in size.
+            ld      c, 100
+            add     hl, bc
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+3], a
+
+            ; print timer_frames
+            ld      a, [timer_frames]
+            ld      c, a
+            ld      a, $00
+            ld      b, a
+
+            ld      hl, tens_digits_table
+            add     hl, bc
+
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+5], a
+
+            ; read from ones_digits_table. to save CPU time i can just add 100 to the previous offset...
+            ; ...since that table is located immediately after tens_digits_table and it's 100 in size.
+            ld      c, 100
+            add     hl, bc
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+6], a
+
+
+            ;ld      b, a
+            ;swap    a
+            ;and     $0f
+            ;add     TILE_0_INGAME
+            ;ld      [VRAM_FRAME_COUNTER+0], a
+            ;ld      a, b
+            ;and     $0f
+            ;add     TILE_0_INGAME
+            ;ld      [VRAM_FRAME_COUNTER+1], a
+
+            ld      a, $01
+            ld      [already_printed_timer], a
+            jr      .vblank_continue
+
+.reset_already_printed_timer
+            ld      a, $00
+            ld      [already_printed_timer], a
+
+.vblank_continue
+
 IF LAGCOUNTER == 1
             ld      a, [lag_frames]
             ld      b, a
@@ -913,3 +1027,35 @@ SECTION "busy_loop", ROM0[$3456]
             ld      a, $20
             ld      [SELECT_ROM_BANK], a
 ENDC
+
+; experiment, suppress call that overwrites part of VRAM with NUM_LETTERS
+;SECTION "suppress_letter_tiles", ROMX[$726F], BANK[2]
+;            nop
+;            nop
+;            nop
+
+; TODO: update using relative values to TILE_0_INGAME
+; lookup tables for quick hex to dec conversion. this saves CPU time at the expense of ROM space.
+tens_digits_table::
+            db $f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0 ; 0
+            db $f1,$f1,$f1,$f1,$f1,$f1,$f1,$f1,$f1,$f1 ; 10
+            db $f2,$f2,$f2,$f2,$f2,$f2,$f2,$f2,$f2,$f2 ; 20
+            db $f3,$f3,$f3,$f3,$f3,$f3,$f3,$f3,$f3,$f3 ; 30
+            db $f4,$f4,$f4,$f4,$f4,$f4,$f4,$f4,$f4,$f4 ; 40
+            db $f5,$f5,$f5,$f5,$f5,$f5,$f5,$f5,$f5,$f5 ; 50
+            db $f6,$f6,$f6,$f6,$f6,$f6,$f6,$f6,$f6,$f6 ; 60
+            db $f7,$f7,$f7,$f7,$f7,$f7,$f7,$f7,$f7,$f7 ; 70
+            db $f8,$f8,$f8,$f8,$f8,$f8,$f8,$f8,$f8,$f8 ; 80
+            db $f9,$f9,$f9,$f9,$f9,$f9,$f9,$f9,$f9,$f9 ; 90
+
+ones_digits_table::
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 0
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 10
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 20
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 30
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 40
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 50
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 60
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 70
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 80
+            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 90
