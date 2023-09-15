@@ -49,7 +49,8 @@ ERASE_MEM_IN_8_BYTE_CHUNKS  equ     $3949
 CHAR_DIXIE_FLAG             equ     $ffac
 CHAR_BOTH_FLAG              equ     $ffad
 
-OWN_GFX_VRAM                equ     $8f00
+OWN_GFX_VRAM                equ     $8670
+OWN_GFX_VRAM_TIMER          equ     $8f00
 OWN_GFX_TILES               equ     (OWN_GFX_VRAM >> 4) & $ff
 
 TILE_VERSION                equ     OWN_GFX_TILES + 0
@@ -139,7 +140,7 @@ SECTION "menu_loader", ROM0[$0186]
 SECTION "suppress_overworld", ROMX[$70b3], BANK[2]
             jp      $7168
 SECTION "jump_over_overworld", ROMX[$7178], BANK[2]
-IF FRAMECOUNTER == 1
+IF FRAMECOUNTER == 1       
             ld      b, a
             xor     a
             ld      [timer_frames], a
@@ -559,23 +560,11 @@ handle_left_press::
 set_characters::
             ld      a, [selected_char]
             and     a
+            jr      z, .dixie_diddy
+            dec     a
             jr      z, .dixie
             dec     a
-            jr      z, .diddy
-            dec     a
-            jr      z, .dixie_diddy
-.diddy_dixie
-            xor     a
-            ldh     [CHAR_DIXIE_FLAG], a
-            inc     a
-            ldh     [CHAR_BOTH_FLAG], a
-            ret
-.dixie
-            xor     a
-            ldh     [CHAR_BOTH_FLAG], a
-            inc     a
-            ldh     [CHAR_DIXIE_FLAG], a
-            ret
+            jr      z, .diddy_dixie
 .diddy
             xor     a
             ldh     [CHAR_DIXIE_FLAG], a
@@ -584,6 +573,18 @@ set_characters::
 .dixie_diddy
             ld      a, 1
             ldh     [CHAR_DIXIE_FLAG], a
+            ldh     [CHAR_BOTH_FLAG], a
+            ret
+.dixie
+            xor     a
+            ldh     [CHAR_BOTH_FLAG], a
+            inc     a
+            ldh     [CHAR_DIXIE_FLAG], a
+            ret
+.diddy_dixie
+            xor     a
+            ldh     [CHAR_DIXIE_FLAG], a
+            inc     a
             ldh     [CHAR_BOTH_FLAG], a
             ret
 
@@ -626,6 +627,11 @@ start_level::
 
             call    set_characters
             call    set_level_id
+
+IF FRAMECOUNTER == 1
+            call    copy_alnum
+ENDC
+
             pop     hl
 
             jp      $0199
@@ -635,10 +641,6 @@ copy_alnum::
             ld      de, VRAM_DIGITS
             ld      hl, OWN_GFX_VRAM
             ld      b, $10*NUM_DIGITS
-            call    copy_from_de_to_hl
-
-            ld      de, VRAM_LETTERS
-            ld      b, $10*NUM_LETTERS
             call    copy_from_de_to_hl
 
             ret
@@ -879,7 +881,7 @@ my_vblank::
 
 
 .check_if_should_print
-; check if in valid state to print timer   
+            ; check if in valid state to print timer   
             ld      a, [$df6e]
             cp      $01
             jr      nz, .reset_already_printed_timer
@@ -887,6 +889,20 @@ my_vblank::
             ld      a, [already_printed_timer]
             cp      $01
             jr      z, .vblank_continue
+
+
+            ; set up numbers in vram
+            ld      de, OWN_GFX_VRAM
+            ld      hl, OWN_GFX_VRAM_TIMER
+            ld      b, $10*NUM_DIGITS
+
+            ; uuuh why do i have to do this
+            .loop
+            ld      a, [de]
+            ld      [hl+], a
+            inc     de
+            dec     b
+            jr      nz, .loop
 
 
             ; print timer_minutes
@@ -1028,11 +1044,6 @@ SECTION "busy_loop", ROM0[$3456]
             ld      [SELECT_ROM_BANK], a
 ENDC
 
-; experiment, suppress call that overwrites part of VRAM with NUM_LETTERS
-;SECTION "suppress_letter_tiles", ROMX[$726F], BANK[2]
-;            nop
-;            nop
-;            nop
 
 ; TODO: update using relative values to TILE_0_INGAME
 ; lookup tables for quick hex to dec conversion. this saves CPU time at the expense of ROM space.
@@ -1059,3 +1070,15 @@ ones_digits_table::
             db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 70
             db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 80
             db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 90
+
+; experiment, instead of quitting to overworld when pressing start+select, restart the level
+SECTION "reload_level_instead_of_overworld", ROM0[$030f]
+            ld      a, MY_BANK
+            ld      [SELECT_ROM_BANK], a
+            jp      start_level
+
+; experiment, suppress call that overwrites part of VRAM with NUM_LETTERS
+SECTION "suppress_letter_tiles", ROMX[$726F], BANK[2]
+            nop
+            nop
+            nop

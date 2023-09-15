@@ -3,10 +3,10 @@
 
  W  L  CHARACTER
 --------------------
- 1     DIXIE
- 2     DIDDY
- 3     DIXIE/DIDDY
- 4     DIDDY/DIXIE
+ 1     DIXIE/DIDDY
+ 2     DIXIE
+ 3     DIDDY/DIXIE
+ 4     DIDDY
  5
  6
  7
