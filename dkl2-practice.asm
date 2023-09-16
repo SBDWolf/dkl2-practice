@@ -9,7 +9,7 @@ TILE_0                      equ     $ba
 TILE_SPACE                  equ     $00
 SELECT_ROM_BANK             equ     $2000
 CUR_ROM_BANK                equ     $4000
-MY_CODE_START               equ     $4400
+MY_CODE_START               equ     $5000
 MY_BANK                     equ     $20
 TURN_ON_LCD                 equ     $3982
 READ_JOYPAD_BUTTONS         equ     $3839
@@ -141,14 +141,15 @@ SECTION "menu_loader", ROM0[$0186]
 SECTION "suppress_overworld", ROMX[$70b3], BANK[2]
             jp      $7168
 SECTION "jump_over_overworld", ROMX[$7178], BANK[2]
-IF FRAMECOUNTER == 1       
             ld      b, a
+IF FRAMECOUNTER == 1       
             xor     a
             ld      [timer_frames], a
             ld      [timer_seconds], a
             ld      [timer_minutes], a
-            ld      a, b
 ENDC
+            call    set_characters_bank_2
+            ld      a, b
             jr      $7199
 
 SECTION "do_not_decrement_lives", ROM0[$037c]
@@ -638,6 +639,24 @@ ENDC
 
             jp      $0199
 
+; experimental
+start_level_with_characters::
+            call    wait_for_vblank
+            ld      hl, LCDC
+            res     7, [hl]
+
+            call    set_characters
+
+IF FRAMECOUNTER == 1
+            call    copy_alnum
+ENDC
+
+            pop     hl
+
+            jp      $0199
+
+
+
 IF FRAMECOUNTER == 1
 copy_alnum::
             ld      de, VRAM_DIGITS
@@ -886,7 +905,15 @@ my_vblank::
             ; check if in valid state to print timer   
             ld      a, [$df6e]
             cp      $01
-            jp      nz, .reset_already_printed_timer
+            jr      z, .vblank_continue2
+
+            ld      a, [$df67]
+            cp      $02
+            jr      z, .vblank_continue2
+
+            jp .reset_already_printed_timer
+
+            .vblank_continue2
 
             ld      a, [already_printed_timer]
             cp      $01
@@ -904,7 +931,7 @@ my_vblank::
 
 
             .phase_three
-            ld      de, OWN_GFX_VRAM+$10*8
+            ld      de, vram_numbers_digits+$10*8
             ld      hl, OWN_GFX_VRAM_TIMER+$10*8
             ld      b, $10*2
             .loop3
@@ -920,7 +947,7 @@ my_vblank::
 
             
             .phase_one
-            ld      de, OWN_GFX_VRAM
+            ld      de, vram_numbers_digits
             ld      hl, OWN_GFX_VRAM_TIMER
             ld      b, $10*4
             .loop1
@@ -935,7 +962,7 @@ my_vblank::
             jp      .vblank_continue
             
             .phase_two
-            ld      de, OWN_GFX_VRAM+$10*4
+            ld      de, vram_numbers_digits+$10*4
             ld      hl, OWN_GFX_VRAM_TIMER+$10*4
             ld      b, $10*4
             .loop2
@@ -1085,38 +1112,64 @@ ENDC
 
 ; TODO: update using relative values to TILE_0_INGAME
 ; lookup tables for quick hex to dec conversion. this saves CPU time at the expense of ROM space.
+IF FRAMECOUNTER == 1
 tens_digits_table::
-            db $f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0 ; 0
-            db $f1,$f1,$f1,$f1,$f1,$f1,$f1,$f1,$f1,$f1 ; 10
-            db $f2,$f2,$f2,$f2,$f2,$f2,$f2,$f2,$f2,$f2 ; 20
-            db $f3,$f3,$f3,$f3,$f3,$f3,$f3,$f3,$f3,$f3 ; 30
-            db $f4,$f4,$f4,$f4,$f4,$f4,$f4,$f4,$f4,$f4 ; 40
-            db $f5,$f5,$f5,$f5,$f5,$f5,$f5,$f5,$f5,$f5 ; 50
-            db $f6,$f6,$f6,$f6,$f6,$f6,$f6,$f6,$f6,$f6 ; 60
-            db $f7,$f7,$f7,$f7,$f7,$f7,$f7,$f7,$f7,$f7 ; 70
-            db $f8,$f8,$f8,$f8,$f8,$f8,$f8,$f8,$f8,$f8 ; 80
-            db $f9,$f9,$f9,$f9,$f9,$f9,$f9,$f9,$f9,$f9 ; 90
+            db TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0,TILE_0_INGAME+0 ; 0
+            db TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1,TILE_0_INGAME+1 ; 10
+            db TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2,TILE_0_INGAME+2 ; 20
+            db TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3,TILE_0_INGAME+3 ; 30
+            db TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4,TILE_0_INGAME+4 ; 40
+            db TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5,TILE_0_INGAME+5 ; 50
+            db TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6,TILE_0_INGAME+6 ; 60
+            db TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7,TILE_0_INGAME+7 ; 70
+            db TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8,TILE_0_INGAME+8 ; 80
+            db TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9,TILE_0_INGAME+9 ; 90
 
 ones_digits_table::
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 0
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 10
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 20
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 30
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 40
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 50
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 60
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 70
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 80
-            db $f0,$f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9 ; 90
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 0
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 10
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 20
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 30
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 40
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 50
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 60
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 70
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 80
+            db TILE_0_INGAME+0,TILE_0_INGAME+1,TILE_0_INGAME+2,TILE_0_INGAME+3,TILE_0_INGAME+4,TILE_0_INGAME+5,TILE_0_INGAME+6,TILE_0_INGAME+7,TILE_0_INGAME+8,TILE_0_INGAME+9 ; 90
+ENDC
+; numbers as they appear in vram. this allows me to quickly set them up before printing the timer without having to switch bank.
+vram_numbers_digits::
+            db $3c,$3c,$7e,$66,$77,$66,$77,$66,$77,$66,$77,$66,$3f,$3c,$3e,$00,$18,$18,$3c,$38,$3c,$18,$1c,$18,$1c,$18,$3c,$3c,$3e,$3c,$3e,$00,$3c,$3c,$7e,$66,$76,$66,$3e,$0c,$1c,$18,$7f,$7e,$7f,$7e,$3e,$00,$3c,$3c,$7e,$66,$27,$06,$1f,$1c,$0e,$06,$67,$46,$3f,$3c,$3e,$00,$60,$60,$70,$60,$7c,$6c,$7e,$7e,$7f,$7e,$3f,$0c,$0e,$0c,$06,$00,$7e,$7e,$7f,$60,$70,$60,$7c,$7c,$3e,$06,$77,$66,$3f,$3c,$3e,$00,$3c,$3c,$7e,$66,$73,$60,$7c,$7c,$77,$66,$77,$66,$3f,$3c,$3e,$00,$7e,$7e,$3f,$06,$07,$06,$0f,$0c,$0e,$0c,$1e,$18,$1c,$18,$0c,$00,$3c,$3c,$7e,$66,$77,$66,$3f,$3c,$76,$66,$77,$66,$3f,$3c,$3e,$00,$3c,$3c,$7e,$66,$77,$66,$3f,$3e,$1f,$06,$77,$66,$3f,$3c,$1e,$00
 
-; experiment, instead of quitting to overworld when pressing start+select, restart the level
-SECTION "reload_level_instead_of_overworld", ROM0[$030f]
-            ld      a, MY_BANK
-            ld      [SELECT_ROM_BANK], a
-            jp      start_level
-
-; experiment, suppress call that overwrites part of VRAM with NUM_LETTERS
-SECTION "suppress_letter_tiles", ROMX[$726F], BANK[2]
-            nop
-            nop
-            nop
+; copy of set_characters in bank 2. this replaces funky's dialogue which is inaccessible on the practice hack anyway.
+SECTION "set_characters_bank_2", ROMX[$6945], BANK[2]
+set_characters_bank_2::
+            ld      a, [selected_char]
+            and     a
+            jr      z, .dixie_diddy
+            dec     a
+            jr      z, .dixie
+            dec     a
+            jr      z, .diddy_dixie
+.diddy
+            xor     a
+            ldh     [CHAR_DIXIE_FLAG], a
+            ldh     [CHAR_BOTH_FLAG], a
+            ret
+.dixie_diddy
+            ld      a, 1
+            ldh     [CHAR_DIXIE_FLAG], a
+            ldh     [CHAR_BOTH_FLAG], a
+            ret
+.dixie
+            xor     a
+            ldh     [CHAR_BOTH_FLAG], a
+            inc     a
+            ldh     [CHAR_DIXIE_FLAG], a
+            ret
+.diddy_dixie
+            xor     a
+            ldh     [CHAR_DIXIE_FLAG], a
+            inc     a
+            ldh     [CHAR_BOTH_FLAG], a
+            ret
