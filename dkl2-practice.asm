@@ -48,9 +48,12 @@ NUM_LIVES                   equ     16
 ERASE_MEM_IN_8_BYTE_CHUNKS  equ     $3949
 CHAR_DIXIE_FLAG             equ     $ffac
 CHAR_BOTH_FLAG              equ     $ffad
+; it is apparently necessary to zero this out before loading the main menu...
+; ...otherwise opening it during a loading screen will put the game into an infinite loop
+WEIRD_VALUE                 equ     $df6a
 
-OWN_GFX_VRAM                equ     $8670
-OWN_GFX_VRAM_TIMER          equ     $8f00
+OWN_GFX_VRAM                equ     $8f00
+OWN_GFX_VRAM_TIMER          equ     $9700
 OWN_GFX_TILES               equ     (OWN_GFX_VRAM >> 4) & $ff
 
 TILE_VERSION                equ     OWN_GFX_TILES + 0
@@ -62,7 +65,7 @@ VRAM_DIGITS                 equ     $8ba0
 NUM_DIGITS                  equ     10
 VRAM_LETTERS                equ     $8a00
 NUM_LETTERS                 equ     6
-TILE_0_INGAME               equ     $f0
+TILE_0_INGAME               equ     $70
 VRAM_FRAME_COUNTER          equ     $9c00
 IF LAGCOUNTER == 1
 VRAM_LAG_COUNTER            equ     $9c03
@@ -224,6 +227,8 @@ turn_off_sound::
             ret
 
 init_variables::
+            ld      a, $00
+            ld      [WEIRD_VALUE], a
             ld      a, [first_boot]
             cp      FIRST_BOOT_MAGIC
             ret     z
@@ -929,27 +934,29 @@ my_vblank::
             dec     a
             jr      z, .phase_two
 
+            dec     a
+            jr      z, .phase_three
 
-            .phase_three
-            ld      de, vram_numbers_digits+$10*8
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*8
-            ld      b, $10*2
-            .loop3
+
+            .phase_four
+            ld      de, vram_numbers_digits+$10*9
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*9
+            ld      b, $10
+            .loop4
             ld      a, [de]
             ld      [hl+], a
             inc     de
             dec     b
-            jr      nz, .loop3
+            jr      nz, .loop4
             ld      a, [vram_transfer_phase_timer]
             inc     a
             ld      [vram_transfer_phase_timer], a
             jp      .print_timer
 
-            
             .phase_one
             ld      de, vram_numbers_digits
             ld      hl, OWN_GFX_VRAM_TIMER
-            ld      b, $10*4
+            ld      b, $10*3
             .loop1
             ld      a, [de]
             ld      [hl+], a
@@ -962,15 +969,30 @@ my_vblank::
             jp      .vblank_continue
             
             .phase_two
-            ld      de, vram_numbers_digits+$10*4
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*4
-            ld      b, $10*4
+            ld      de, vram_numbers_digits+$10*3
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*3
+            ld      b, $10*3
             .loop2
             ld      a, [de]
             ld      [hl+], a
             inc     de
             dec     b
             jr      nz, .loop2
+            ld      a, [vram_transfer_phase_timer]
+            inc     a
+            ld      [vram_transfer_phase_timer], a
+            jp      .vblank_continue
+
+            .phase_three
+            ld      de, vram_numbers_digits+$10*6
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*6
+            ld      b, $10*3
+            .loop3
+            ld      a, [de]
+            ld      [hl+], a
+            inc     de
+            dec     b
+            jr      nz, .loop3
             ld      a, [vram_transfer_phase_timer]
             inc     a
             ld      [vram_transfer_phase_timer], a
