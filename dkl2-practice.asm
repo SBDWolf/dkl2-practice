@@ -946,20 +946,17 @@ my_vblank::
             dec     a
             jr      z, .phase_three
 
-            dec     a
-            jr      z, .phase_four
 
-
-            .phase_five
-            ld      de, vram_numbers_digits+$10*8
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*8
-            ld      b, $10*2
-            .loop5
+            .phase_four
+            ld      de, vram_numbers_digits+$7e
+            ld      hl, OWN_GFX_VRAM_TIMER+$7e
+            ld      b, $22
+            .loop4
             ld      a, [de]
             ld      [hl+], a
             inc     de
             dec     b
-            jr      nz, .loop5
+            jr      nz, .loop4
             ld      a, [vram_transfer_phase_timer]
             inc     a
             ld      [vram_transfer_phase_timer], a
@@ -970,7 +967,7 @@ my_vblank::
             .phase_one
             ld      de, vram_numbers_digits
             ld      hl, OWN_GFX_VRAM_TIMER
-            ld      b, $10*2
+            ld      b, $2a
             .loop1
             ld      a, [de]
             ld      [hl+], a
@@ -983,9 +980,9 @@ my_vblank::
             jp      .vblank_continue
             
             .phase_two
-            ld      de, vram_numbers_digits+$10*2
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*2
-            ld      b, $10*2
+            ld      de, vram_numbers_digits+$2a
+            ld      hl, OWN_GFX_VRAM_TIMER+$2a
+            ld      b, $2a
             .loop2
             ld      a, [de]
             ld      [hl+], a
@@ -998,30 +995,15 @@ my_vblank::
             jp      .vblank_continue
 
             .phase_three
-            ld      de, vram_numbers_digits+$10*4
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*4
-            ld      b, $10*2
+            ld      de, vram_numbers_digits+$54
+            ld      hl, OWN_GFX_VRAM_TIMER+$54
+            ld      b, $2a
             .loop3
             ld      a, [de]
             ld      [hl+], a
             inc     de
             dec     b
             jr      nz, .loop3
-            ld      a, [vram_transfer_phase_timer]
-            inc     a
-            ld      [vram_transfer_phase_timer], a
-            jp      .vblank_continue
-
-            .phase_four
-            ld      de, vram_numbers_digits+$10*6
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*6
-            ld      b, $10*2
-            .loop4
-            ld      a, [de]
-            ld      [hl+], a
-            inc     de
-            dec     b
-            jr      nz, .loop4
             ld      a, [vram_transfer_phase_timer]
             inc     a
             ld      [vram_transfer_phase_timer], a
