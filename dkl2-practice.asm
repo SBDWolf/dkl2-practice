@@ -105,9 +105,12 @@ FIRST_BOOT_MAGIC            equ     $ab
 SECTION "variables", WRAMX[FREE_WRAM], BANK[1]
 first_boot:                 db
 uncapped_frames:            db
-timer_frames:               db
-timer_seconds:              db
-timer_minutes:              db
+timer_room_frames:          db
+timer_room_seconds:         db
+timer_room_minutes:         db
+timer_level_frames:         db
+timer_level_seconds:        db
+timer_level_minutes:        db
 lag_frames:                 db
 already_printed_timer:      db
 vram_transfer_phase_timer:  db
@@ -147,9 +150,12 @@ SECTION "jump_over_overworld", ROMX[$7178], BANK[2]
             ld      b, a
 IF FRAMECOUNTER == 1       
             xor     a
-            ld      [timer_frames], a
-            ld      [timer_seconds], a
-            ld      [timer_minutes], a
+            ld      [timer_room_frames], a
+            ld      [timer_room_seconds], a
+            ld      [timer_room_minutes], a
+            ld      [timer_level_frames], a
+            ld      [timer_level_seconds], a
+            ld      [timer_level_minutes], a
 ENDC
             call    set_characters_bank_2
             ld      a, b
@@ -237,9 +243,12 @@ init_variables::
             xor     a
             ld      [uncapped_frames], a
 IF FRAMECOUNTER == 1
-            ld      [timer_frames], a
-            ld      [timer_seconds], a
-            ld      [timer_minutes], a
+            ld      [timer_room_frames], a
+            ld      [timer_room_seconds], a
+            ld      [timer_room_minutes], a
+            ld      [timer_level_frames], a
+            ld      [timer_level_seconds], a
+            ld      [timer_level_minutes], a
 ENDC
             ld      [lag_frames], a
             ld      [vram_transfer_phase_timer], a
@@ -875,35 +884,35 @@ end_of_own_graphics::
 
 IF FRAMECOUNTER == 1
 my_vblank::
-            ld      a, [timer_frames]
+            ld      a, [timer_room_frames]
             inc     a
-            ld      [timer_frames], a
+            ld      [timer_room_frames], a
             cp      60
             jr      nz, .check_if_should_print
 
             xor     a
-            ld      [timer_frames], a
+            ld      [timer_room_frames], a
 
-            ld      a, [timer_seconds]
+            ld      a, [timer_room_seconds]
             inc     a
-            ld      [timer_seconds], a
+            ld      [timer_room_seconds], a
             cp      60
             jr      nz, .check_if_should_print
 
             xor     a
-            ld      [timer_seconds], a
+            ld      [timer_room_seconds], a
 
-            ld      a, [timer_minutes]
+            ld      a, [timer_room_minutes]
             inc     a
-            ld      [timer_minutes], a
+            ld      [timer_room_minutes], a
             cp      10
             jr      nz, .check_if_should_print
 
             ld      a, 9
-            ld      [timer_minutes], a
+            ld      [timer_room_minutes], a
             ld      a, 59
-            ld      [timer_seconds], a
-            ld      [timer_frames], a
+            ld      [timer_room_seconds], a
+            ld      [timer_room_frames], a
 
 
 .check_if_should_print
@@ -937,26 +946,31 @@ my_vblank::
             dec     a
             jr      z, .phase_three
 
+            dec     a
+            jr      z, .phase_four
 
-            .phase_four
-            ld      de, vram_numbers_digits+$10*9
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*9
-            ld      b, $10
-            .loop4
+
+            .phase_five
+            ld      de, vram_numbers_digits+$10*8
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*8
+            ld      b, $10*2
+            .loop5
             ld      a, [de]
             ld      [hl+], a
             inc     de
             dec     b
-            jr      nz, .loop4
+            jr      nz, .loop5
             ld      a, [vram_transfer_phase_timer]
             inc     a
             ld      [vram_transfer_phase_timer], a
-            jp      .print_timer
+            jp      .add_to_level_timer
+
+
 
             .phase_one
             ld      de, vram_numbers_digits
             ld      hl, OWN_GFX_VRAM_TIMER
-            ld      b, $10*3
+            ld      b, $10*2
             .loop1
             ld      a, [de]
             ld      [hl+], a
@@ -969,9 +983,9 @@ my_vblank::
             jp      .vblank_continue
             
             .phase_two
-            ld      de, vram_numbers_digits+$10*3
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*3
-            ld      b, $10*3
+            ld      de, vram_numbers_digits+$10*2
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*2
+            ld      b, $10*2
             .loop2
             ld      a, [de]
             ld      [hl+], a
@@ -984,9 +998,9 @@ my_vblank::
             jp      .vblank_continue
 
             .phase_three
-            ld      de, vram_numbers_digits+$10*6
-            ld      hl, OWN_GFX_VRAM_TIMER+$10*6
-            ld      b, $10*3
+            ld      de, vram_numbers_digits+$10*4
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*4
+            ld      b, $10*2
             .loop3
             ld      a, [de]
             ld      [hl+], a
@@ -998,9 +1012,73 @@ my_vblank::
             ld      [vram_transfer_phase_timer], a
             jp      .vblank_continue
 
-            .print_timer
-            ; print timer_minutes
-            ld      a, [timer_minutes]
+            .phase_four
+            ld      de, vram_numbers_digits+$10*6
+            ld      hl, OWN_GFX_VRAM_TIMER+$10*6
+            ld      b, $10*2
+            .loop4
+            ld      a, [de]
+            ld      [hl+], a
+            inc     de
+            dec     b
+            jr      nz, .loop4
+            ld      a, [vram_transfer_phase_timer]
+            inc     a
+            ld      [vram_transfer_phase_timer], a
+            jp      .vblank_continue
+
+            .add_to_level_timer
+            ld      hl, timer_level_frames
+            ld      a, [timer_room_frames]
+            add     a, [hl]
+            cp      60
+            jr      c, .store_level_frames
+
+            sub     60
+            inc     hl
+            inc     [hl]
+            dec     hl
+
+            .store_level_frames
+
+            ld      [hl], a
+            inc     hl
+
+            ; level_seconds
+            ld      a, [timer_room_seconds]
+            add     a, [hl]
+            cp      60
+            jr      c, .store_level_seconds
+
+            sub     60
+            inc     hl
+            inc     [hl]
+            dec     hl
+
+            .store_level_seconds
+
+            ld      [hl], a
+            inc     hl
+
+            ; level_minutes
+            ld      a, [timer_room_minutes]
+            add     a, [hl]
+            cp      9
+            jr      c, .store_level_minutes
+
+            ; cap timer
+            ld      a, 59
+            ld      [timer_level_frames], a
+            ld      [timer_level_seconds], a
+            ld      a, 9
+
+            .store_level_minutes
+
+            ld      [hl], a        
+            
+
+            ; print timer_room_minutes
+            ld      a, [timer_room_minutes]
             ld      c, a
             ld      a, $00
             ld      b, a
@@ -1012,8 +1090,8 @@ my_vblank::
             ld      [VRAM_FRAME_COUNTER+0], a
 
 
-            ; print timer_seconds
-            ld      a, [timer_seconds]
+            ; print timer_room_seconds
+            ld      a, [timer_room_seconds]
             ld      c, a
             ld      a, $00
             ld      b, a
@@ -1031,8 +1109,8 @@ my_vblank::
             ld      a, [hl]
             ld      [VRAM_FRAME_COUNTER+3], a
 
-            ; print timer_frames
-            ld      a, [timer_frames]
+            ; print timer_room_frames
+            ld      a, [timer_room_frames]
             ld      c, a
             ld      a, $00
             ld      b, a
@@ -1043,18 +1121,69 @@ my_vblank::
             ld      a, [hl]
             ld      [VRAM_FRAME_COUNTER+5], a
 
-            ; read from ones_digits_table. to save CPU time i can just add 100 to the previous offset...
-            ; ...since that table is located immediately after tens_digits_table and it's 100 in size.
             ld      c, 100
             add     hl, bc
             ld      a, [hl]
             ld      [VRAM_FRAME_COUNTER+6], a
+
+; -------------------------------------------------------------------------------------------------------------
+
+            ; print timer_level_minutes
+            ld      a, [timer_level_minutes]
+            ld      c, a
+            ld      a, $00
+            ld      b, a
+
+            ld      hl, ones_digits_table
+            add     hl, bc
+
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+32], a
+
+
+            ; print timer_level_seconds
+            ld      a, [timer_level_seconds]
+            ld      c, a
+            ld      a, $00
+            ld      b, a
+
+            ld      hl, tens_digits_table
+            add     hl, bc
+
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+34], a
+
+            ld      c, 100
+            add     hl, bc
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+35], a
+
+            ; print timer_level_frames
+            ld      a, [timer_level_frames]
+            ld      c, a
+            ld      a, $00
+            ld      b, a
+
+            ld      hl, tens_digits_table
+            add     hl, bc
+
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+37], a
+
+            ld      c, 100
+            add     hl, bc
+            ld      a, [hl]
+            ld      [VRAM_FRAME_COUNTER+38], a
+
 
 
             ld      a, $01
             ld      [already_printed_timer], a
             ld      a, $00
             ld      [vram_transfer_phase_timer], a
+            ld      [timer_room_frames], a
+            ld      [timer_room_seconds], a
+            ld      [timer_room_minutes], a
 
             jr      .vblank_continue
 
