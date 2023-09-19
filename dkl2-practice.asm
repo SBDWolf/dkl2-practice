@@ -158,6 +158,7 @@ IF FRAMECOUNTER == 1
             ld      [timer_level_minutes], a
 ENDC
             call    set_characters_bank_2
+            ;call    set_level_id_bank_2
             ld      a, b
             jr      $7199
 
@@ -171,6 +172,11 @@ SECTION "suppress_altering_of_both_characters_flag", ROM0[$01ec]
 SECTION "change_star_barrel_flag_detection", ROM0[$0229]
             ld      a, [star_barrel_flag]
             and     a
+
+SECTION "suppress_level_change_after_bosses", ROM0[$035f]
+            nop
+            nop
+            nop
 
 
 
@@ -652,23 +658,6 @@ ENDC
             pop     hl
 
             jp      $0199
-
-; experimental
-start_level_with_characters::
-            call    wait_for_vblank
-            ld      hl, LCDC
-            res     7, [hl]
-
-            call    set_characters
-
-IF FRAMECOUNTER == 1
-            call    copy_alnum
-ENDC
-
-            pop     hl
-
-            jp      $0199
-
 
 
 IF FRAMECOUNTER == 1
@@ -1306,3 +1295,4 @@ set_characters_bank_2::
             inc     a
             ldh     [CHAR_BOTH_FLAG], a
             ret
+
